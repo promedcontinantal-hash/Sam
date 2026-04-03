@@ -210,9 +210,6 @@ body{display:flex;flex-direction:column;font-family:'DM Sans',system-ui,sans-ser
   </div>
 </div>
 <script>
-const GK='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';
-const GA='https://api.groq.com/openai/v1/chat/completions';
-const GM='llama-3.3-70b-versatile';
 const D={msgs:[],mem:{},evo:[],moral:'',cfg:{name:'',email:'',v:true,w:true,b:false,ejs_sid:'',ejs_tid:'',ejs_pk:''},busy:false,mic:false,awake:false,sm:0};
 const PILLS=['● CHAT','◎ DEEP SEARCH','◉ VERY DEEP'];
 const PCLS=['normal','deep','vdeep'];
@@ -243,11 +240,27 @@ function load(){
   try{const v=localStorage.getItem('sam_moral');if(v!==null)D.moral=v;}catch(e){}
 }
 
-async function callGroq(messages){
-  const r=await fetch(GA,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+GK},body:JSON.stringify({model:GM,messages,max_tokens:1024,temperature:0.9})});
-  if(!r.ok){const e=await r.text();throw new Error(e.substring(0,150));}
-  const d=await r.json();
-  return d.choices?.[0]?.message?.content||'...';
+async function callLocal(messages){
+  const r = await fetch('http://localhost:1234/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'local-model',
+      messages: messages,
+      max_tokens: 1024,
+      temperature: 0.9
+    })
+  });
+
+  if (!r.ok) {
+    const e = await r.text();
+    throw new Error(e.substring(0, 150));
+  }
+
+  const d = await r.json();
+  return d.choices?.[0]?.message?.content || '...';
 }
 
 async function go(){
@@ -262,7 +275,7 @@ async function go(){
     if(D.sm>0){smsg('Searching the web...');const sr=await doSearch(t,D.sm===2);ctx=sr.context;web=sr.web;imgs=sr.images;}
     const sys=bSys()+(ctx?'\n\nSEARCH RESULTS:\n'+ctx:'');
     const msgs=[{role:'system',content:sys},...D.msgs.slice(-20)];
-    const reply=await callGroq(msgs);
+    const reply=await callLocal(msgs);
     hideTy();D.msgs.push({role:'assistant',content:reply});rMsgs();
     if(web||imgs)appendSR(web,imgs);
     setStatus('ready');D.busy=false;
@@ -273,7 +286,7 @@ async function go(){
 
 async function xMem(u,r){
   try{
-    const reply=await callGroq([{role:'user',content:`Extract explicit personal facts stated by user. Only clear facts: name, age, job, city, relationships, struggles, goals. Reply ONLY valid JSON {"key":"value"}. Nothing = {}. No markdown.\nUser: "${u}"\nSam: "${r.substring(0,150)}"\nKnown: ${JSON.stringify(D.mem)}`}]);
+    const reply=await callLocal([{role:'user',content:`Extract explicit personal facts stated by user. Only clear facts: name, age, job, city, relationships, struggles, goals. Reply ONLY valid JSON {"key":"value"}. Nothing = {}. No markdown.\nUser: "${u}"\nSam: "${r.substring(0,150)}"\nKnown: ${JSON.stringify(D.mem)}`}]);
     const ex=JSON.parse(reply.replace(/```json|```/g,'').trim());
     if(Object.keys(ex).length){Object.assign(D.mem,ex);rMem();save();}
   }catch(e){}
