@@ -309,7 +309,7 @@ async function go(){
 
 async function xMem(u,r){
   try{
-    const reply=await callAI([{role:'user',content:`Extract explicit personal facts stated by user. Only clear facts: name, age, job, city, relationships, struggles, goals. Reply ONLY valid JSON {"key":"value"}. Nothing = {}. No markdown.\nUser: "${u}"\nSam: "${r.substring(0,150)}"\nKnown: ${JSON.stringify(D.mem)}`}]);
+  
     const ex=JSON.parse(reply.replace(/```json|```/g,'').trim());
     if(Object.keys(ex).length){Object.assign(D.mem,ex);rMem();save();}
   }catch(e){}
