@@ -298,7 +298,7 @@ async function go(){
     if(D.sm>0){smsg('Searching the web...');const sr=await doSearch(t,D.sm===2);ctx=sr.context;web=sr.web;imgs=sr.images;}
     const sys=bSys()+(ctx?'\n\nSEARCH RESULTS:\n'+ctx:'');
     const msgs=[{role:'system',content:sys},...D.msgs.slice(-6)];
-    const reply=await callAI(msgs);const reply=await callAI([
+    const reply=await callAI(msgs);
     hideTy();D.msgs.push({role:'assistant',content:reply});rMsgs();
     if(web||imgs)appendSR(web,imgs);
     setStatus('ready');D.busy=false;
