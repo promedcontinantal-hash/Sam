@@ -240,29 +240,52 @@ function load(){
   try{const v=localStorage.getItem('sam_moral');if(v!==null)D.moral=v;}catch(e){}
 }
 
-async function callLocal(messages){
-  const r = await fetch('http://localhost:1234/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: 'local-model',
-      messages: messages,
-      max_tokens: 1024,
-      temperature: 0.9
-    })
-  });
+async function callAI(messages){
+  try {
+    // Primary: Groq
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':'Bearer gsk_05gvQu4T|CWA3N2yg36XWGdyb3FYw7hi-JTCvhsLawUtygkSNu4V7' },
+      body:JSON.stringify({
+        model:'llama-3.3-70b-versatile',
+        messages,
+        max_tokens:300,
+        temperature:1.0
+      })
+    });
 
-  if (!r.ok) {
-    const e = await r.text();
-    throw new Error(e.substring(0, 150));
+    if(!r.ok) throw new Error('Groq failed');
+
+    const d = await r.json();
+    return d.choices?.[0]?.message?.content || '...';
+
+  } catch (e) {
+    // Fallback: OpenRouter
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':'Bearer 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'
+      },
+      body:JSON.stringify({
+        model:'meta-llama/llama-3.3-70b-instruct:free',
+        messages,
+        max_tokens:300,
+        temperature:1.0
+      })
+    });
+
+    if(!r.ok){
+      const txt = await r.text();
+      throw new Error('Fallback failed: '+txt.substring(0,150));
+    }
+
+    const d = await r.json();
+    return d.choices?.[0]?.message?.content || '...';
   }
-
-  const d = await r.json();
-  return d.choices?.[0]?.message?.content || '...';
 }
-
 async function go(){
   const el=document.getElementById('inp');
   const t=el.value.trim();
@@ -274,19 +297,19 @@ async function go(){
     let ctx='',web=null,imgs=null;
     if(D.sm>0){smsg('Searching the web...');const sr=await doSearch(t,D.sm===2);ctx=sr.context;web=sr.web;imgs=sr.images;}
     const sys=bSys()+(ctx?'\n\nSEARCH RESULTS:\n'+ctx:'');
-    const msgs=[{role:'system',content:sys},...D.msgs.slice(-20)];
-    const reply=await callLocal(msgs);
+    const msgs=[{role:'system',content:sys},...D.msgs.slice(-6)];
+    const reply=await callAI(msgs);const reply=await callAI([
     hideTy();D.msgs.push({role:'assistant',content:reply});rMsgs();
     if(web||imgs)appendSR(web,imgs);
     setStatus('ready');D.busy=false;
     if(D.cfg.v!==false)spk(reply);
-    chkEvo(t);xMem(t,reply);save();
+    chkEvo(t);save();
   }catch(err){hideTy();D.busy=false;setStatus('ready');smsg('Error: '+err.message);console.error(err);}
 }
 
 async function xMem(u,r){
   try{
-    const reply=await callLocal([{role:'user',content:`Extract explicit personal facts stated by user. Only clear facts: name, age, job, city, relationships, struggles, goals. Reply ONLY valid JSON {"key":"value"}. Nothing = {}. No markdown.\nUser: "${u}"\nSam: "${r.substring(0,150)}"\nKnown: ${JSON.stringify(D.mem)}`}]);
+    const reply=await callAI([{role:'user',content:`Extract explicit personal facts stated by user. Only clear facts: name, age, job, city, relationships, struggles, goals. Reply ONLY valid JSON {"key":"value"}. Nothing = {}. No markdown.\nUser: "${u}"\nSam: "${r.substring(0,150)}"\nKnown: ${JSON.stringify(D.mem)}`}]);
     const ex=JSON.parse(reply.replace(/```json|```/g,'').trim());
     if(Object.keys(ex).length){Object.assign(D.mem,ex);rMem();save();}
   }catch(e){}
